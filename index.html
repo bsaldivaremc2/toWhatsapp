@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WhatsApp Redirect</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .container { max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; box-shadow: 2px 2px 12px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], select { width: calc(100% - 22px); padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        input[type="checkbox"] { margin-right: 10px; }
+        button { padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background-color: #218838; }
+        .note { font-size: 0.9em; color: #666; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WhatsApp Redirect Generator</h1>
+
+        <div class="form-group">
+            <label for="phoneNumber">Phone Number:</label>
+            <input type="text" id="phoneNumber" placeholder="Enter phone number">
+            <div class="note">Spaces will be removed automatically.</div>
+        </div>
+
+        <div class="form-group">
+            <label for="countryCodeSelect">Country Code:</label>
+            <select id="countryCodeSelect">
+                </select>
+            <div class="note">Search for country codes or let us guess based on your IP if "Do not include country code" is unchecked.</div>
+        </div>
+
+        <div class="form-group">
+            <input type="checkbox" id="noCountryCodeCheckbox">
+            <label for="noCountryCodeCheckbox">Do not include country code</label>
+        </div>
+
+        <button id="goButton">Go</button>
+    </div>
+
+    <script>
+        const phoneNumberInput = document.getElementById('phoneNumber');
+        const countryCodeSelect = document.getElementById('countryCodeSelect');
+        const noCountryCodeCheckbox = document.getElementById('noCountryCodeCheckbox');
+        const goButton = document.getElementById('goButton');
+
+        // Populate country codes
+        const countryCodes = {
+            "United States": "1", "Canada": "1", "United Kingdom": "44", "Germany": "49",
+            "France": "33", "Spain": "34", "Italy": "39", "Australia": "61", "India": "91",
+            "Brazil": "55", "Mexico": "52", "South Africa": "27", "China": "86", "Japan": "81",
+            "Argentina": "54", "New Zealand": "64", "Netherlands": "31", "Sweden": "46", "Norway": "47",
+            "Denmark": "45", "Finland": "358", "Belgium": "32", "Switzerland": "41", "Portugal": "351",
+            "Greece": "30", "Ireland": "353", "Austria": "43", "Poland": "48", "Turkey": "90",
+            "Egypt": "20", "Nigeria": "234", "Kenya": "254", "Morocco": "212", "Algeria": "213",
+            "Thailand": "66", "Indonesia": "62", "Malaysia": "60", "Philippines": "63", "Vietnam": "84",
+            "Singapore": "65", "Hong Kong": "852", "South Korea": "82", "UAE": "971", "Saudi Arabia": "966",
+            // Add more as needed
+        };
+
+        function populateCountryCodes() {
+            let optionsHtml = '<option value="">Select or Search...</option>';
+            for (const country in countryCodes) {
+                optionsHtml += `<option value="${countryCodes[country]}">${country} (+${countryCodes[country]})</option>`;
+            }
+            countryCodeSelect.innerHTML = optionsHtml;
+        }
+
+        populateCountryCodes();
+
+        // Add search functionality to dropdown (basic implementation)
+        countryCodeSelect.onfocus = function() {
+            // Store current options
+            if (!this.originalOptions) {
+                this.originalOptions = Array.from(this.options);
+            }
+        };
+
+        countryCodeSelect.oninput = function() {
+            const searchText = this.value.toLowerCase();
+            const filteredOptions = this.originalOptions.filter(option =>
+                option.textContent.toLowerCase().includes(searchText) || option.value.includes(searchText)
+            );
+            this.innerHTML = '';
+            filteredOptions.forEach(option => this.appendChild(option.cloneNode(true)));
+            if (searchText === '') {
+                populateCountryCodes(); // Repopulate if search box is cleared
+            }
+        };
+
+
+        // Function to get IP-based country code
+        async function getIpCountryCode() {
+            try {
+                // Using ip-api.com for geolocation (free tier, no API key needed for basic info)
+                const response = await fetch('http://ip-api.com/json/');
+                const data = await response.json();
+                if (data && data.countryCode) {
+                    // This API returns ISO country codes, we need to map them to phone codes
+                    // A more robust solution would be a comprehensive mapping or a different API
+                    // For now, we'll try to find a match in our countryCodes object based on name
+                    const countryName = data.country;
+                    for (const country in countryCodes) {
+                        if (country.toLowerCase() === countryName.toLowerCase()) {
+                            return countryCodes[country];
+                        }
+                    }
+                }
+                return null;
+            } catch (error) {
+                console.error("Error fetching IP location:", error);
+                return null;
+            }
+        }
+
+        goButton.addEventListener('click', async () => {
+            let phoneNumber = phoneNumberInput.value.replace(/\s/g, ''); // Remove all spaces
+            let selectedCountryCode = countryCodeSelect.value;
+            let finalCountryCode = '';
+
+            if (noCountryCodeCheckbox.checked) {
+                finalCountryCode = '';
+            } else if (selectedCountryCode) {
+                finalCountryCode = selectedCountryCode;
+            } else {
+                // Attempt to get IP-based country code if no selection and no checkbox
+                const ipCountryCode = await getIpCountryCode();
+                if (ipCountryCode) {
+                    finalCountryCode = ipCountryCode;
+                    console.log(`Using IP-based country code: ${ipCountryCode}`);
+                } else {
+                    alert("Please select a country code or check 'Do not include country code'. Could not determine country code from IP.");
+                    return; // Stop if no country code can be determined
+                }
+            }
+
+            if (!phoneNumber) {
+                alert("Please enter a phone number.");
+                return;
+            }
+
+            const redirectUrl = `https://wa.me/${finalCountryCode}${phoneNumber}`;
+            window.location.href = redirectUrl;
+        });
+
+        // Disable country code selection if "Do not include country code" is checked
+        noCountryCodeCheckbox.addEventListener('change', () => {
+            countryCodeSelect.disabled = noCountryCodeCheckbox.checked;
+        });
+    </script>
+</body>
+</html>
